@@ -1,4 +1,7 @@
 # Unity-Tilemap-To-Image
+
+Unitypackage: https://github.com/zanthous/Unity-Tilemap-To-Image/blob/master/Assets/Packages/TilemapToImage.unitypackage
+
 Convert large tilemaps to images, supports rotated/flipped tiles
 
 Requires all images used in the tilemap to be marked as Read/Write enabled in their settings. Requires access to System.Drawing.Imaging, setting API compatibility level to .NET Framework solves this issue. 
