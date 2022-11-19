@@ -1,6 +1,6 @@
 # Unity-Tilemap-To-Image
 
-Unitypackage: https://github.com/zanthous/Unity-Tilemap-To-Image/blob/master/Assets/Packages/TilemapToImage.unitypackage
+Download here: https://github.com/zanthous/Unity-Tilemap-To-Image/blob/master/Assets/Packages/TilemapToImage.unitypackage
 
 Convert large tilemaps to images, supports rotated/flipped tiles
 
@@ -15,3 +15,5 @@ Follow my socials if you are interested in the development of a getting over it/
 Twitter: https://twitter.com/ZanthousStudios
 
 Youtube: https://www.youtube.com/@ZanthousStudios
+
+Sprites for example project borrowed from: https://adamatomic.itch.io/cavernas
