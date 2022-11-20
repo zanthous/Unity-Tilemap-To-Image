@@ -6,7 +6,7 @@ using System.Drawing;
 using System;
 using System.Drawing.Imaging;
 using UnityEditor;
-
+using System.Runtime.InteropServices;
 
 namespace Zanthous 
 {
@@ -16,7 +16,6 @@ namespace Zanthous
 		bmp,
 		jpg
 	}
-
 
 	[CustomEditor(typeof(TilemapToImage))]
 	public class TilemapToImageEditor : Editor
@@ -47,13 +46,10 @@ namespace Zanthous
 		int minY = 0;
 		int maxY = 0;
 
-		public Bitmap bmp;
-
 		Color32[] colors;
-		int ySize;
-		int xSize;
-		float width;
-		float height;
+
+		public DirectBitmap bmp;
+		public DirectBitmap overlay;
 
 		public void GenerateSprite()
 		{
@@ -67,29 +63,7 @@ namespace Zanthous
 			maxY = tm.cellBounds.yMax;
 			minY = tm.cellBounds.yMin;
 
-			width = pixelResolution;
-			height = pixelResolution;
-
-			bmp = new Bitmap((int) width * tm.size.x, (int) height * tm.size.y, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-			System.Drawing.Imaging.BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), System.Drawing.Imaging.ImageLockMode.ReadWrite,
-				bmp.PixelFormat);
-
-			xSize = bmp.Width;
-			ySize = bmp.Height;
-
-			//idk why this is abs'd but it was from microsoft documentation so whatever
-			int nBytes = Math.Abs(bmpData.Stride) * bmp.Height;
-
-			byte[] rgba = new byte[nBytes];
-
-			IntPtr ptr = bmpData.Scan0;
-
-			//assign the entire invisible image
-			colors = new Color32[bmp.Width * bmp.Height];
-			for(int i = 0; i < colors.Length; i++)
-			{
-				colors[i] = new Color32(0, 0, 0, 0);
-			}
+			bmp = new DirectBitmap(pixelResolution * tm.size.x, pixelResolution * tm.size.y);
 
 			//assign to each block its respective pixels
 			for(int x = minX; x <= maxX; x++)
@@ -102,25 +76,15 @@ namespace Zanthous
 						var t = tm.GetTransformMatrix(new Vector3Int(x, y, 0));
 
 						SetColors(
-							(x - minX) * (int) width, (y - minY) * (int) height,
-							(int) width,
-							(int) height,
+							(x - minX) * pixelResolution, (y - minY) * pixelResolution,
+							pixelResolution,
+							pixelResolution,
 							GetCurrentSprite(tm.GetSprite(new Vector3Int(x, y, 0)), t).GetPixels32());
 					}
 				}
 			}
 
-			for(int i = 0; i < nBytes / 4; i++)
-			{
-				rgba[i * 4 + 0] = colors[i].b;
-				rgba[i * 4 + 1] = colors[i].g;
-				rgba[i * 4 + 2] = colors[i].r;
-				rgba[i * 4 + 3] = colors[i].a;
-			}
 
-			System.Runtime.InteropServices.Marshal.Copy(rgba, 0, ptr, nBytes);
-			bmp.UnlockBits(bmpData);
-			
 			ExportImage(fileName == "" ? name : fileName, format);
 		}
 		//Copy the color32 values into our temporary array (these will be copied over to the Bitmap afterward)
@@ -130,7 +94,8 @@ namespace Zanthous
 			{
 				for(int j = 0; j < width; j++)
 				{
-					colors[(ySize - pixelResolution - y + i) * xSize + (j + x)] = colors_in[(height - i - 1) * width + j];
+					var col = colors_in[(height - i - 1) * width + j];
+					bmp.SetPixel(j + x, bmp.Height - pixelResolution - y + i, new Color32(col.b, col.g, col.r, col.a));
 				}
 			}
 		}
@@ -208,24 +173,67 @@ namespace Zanthous
 				Directory.CreateDirectory(dirPath);
 			}
 			ImageFormat imageFormat = ImageFormat.Png;
-
+			var ext = "";
 			//add more here if you want
 			switch(format)
 			{
 				case TilemapImageFormat.png:
 					imageFormat = ImageFormat.Png;
+					ext = ".png";
 					break;
 				case TilemapImageFormat.bmp:
 					imageFormat = ImageFormat.Bmp;
+					ext = ".bmp";
 					break;
 				case TilemapImageFormat.jpg:
 					imageFormat = ImageFormat.Jpeg;
+					ext = ".jpg";
 					break;
 			}
-
-			bmp.Save(dirPath + fileName + ".png", imageFormat);
+			var fullPath = dirPath + fileName + ext;
+			bmp.Bitmap.Save(fullPath, imageFormat);
+			Debug.Log("Saved to " + fullPath);
+			Debug.Log("Refresh your assets with ctrl + R or similar");
 			bmp = null;
 		}
+	}
+}
+
+public class DirectBitmap : IDisposable
+{
+	public Bitmap Bitmap { get; private set; }
+	public Color32[] Colors { get; private set; }
+	public bool Disposed { get; private set; }
+	public int Height { get; private set; }
+	public int Width { get; private set; }
+
+	protected GCHandle BitsHandle { get; private set; }
+
+	public DirectBitmap(int width, int height)
+	{
+		Width = width;
+		Height = height;
+		Colors = new Color32[width * height];
+		BitsHandle = GCHandle.Alloc(Colors, GCHandleType.Pinned);
+		Bitmap = new Bitmap(width, height, width * 4, PixelFormat.Format32bppArgb, BitsHandle.AddrOfPinnedObject());
+	}
+
+	public void SetPixel(int x, int y, Color32 colour)
+	{
+		Colors[x + (y * Width)] = colour;
+	}
+
+	public Color32 GetPixel(int x, int y)
+	{
+		return Colors[x + (y * Width)];
+	}
+
+	public void Dispose()
+	{
+		if(Disposed) return;
+		Disposed = true;
+		Bitmap.Dispose();
+		BitsHandle.Free();
 	}
 }
 #endif
